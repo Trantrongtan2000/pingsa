@@ -3,6 +3,8 @@ import time
 import threading
 from ping3 import ping
 import schedule
+import json
+import io
 
 # Khởi tạo session_state
 if 'devices' not in st.session_state:
@@ -26,6 +28,7 @@ else:
 def ping_ip(ip_address, device_name):
     try:
         response = ping(ip_address, timeout=2)
+        if response is not Noneavatars: true
         if response is not None:
             response_ms = round(response * 1000, 1)
             result = f"Ping {ip_address} ({device_name}) thành công: {response_ms}ms"
@@ -46,12 +49,12 @@ def ping_with_interval(ip, name, count, result_container):
 # Hàm ping mỗi phút trong 10 phút
 def ping_per_minute(ip, name, result_container):
     start_time = time.time()
-    max_duration = 600  # 10 phút = 600 giây
+    max_duration = 600  # 10 phút
     while time.time() - start_time < max_duration:
         result = ping_ip(ip, name)
         st.session_state.ping_results.append(f"{time.strftime('%Y-%m-%d %H:%M:%S')}: {result}")
         result_container.write(st.session_state.ping_results[::-1])
-        time.sleep(60)  # Chờ 1 phút
+        time.sleep(60)
 
 # Hàm ping tự động
 def auto_ping(devices):
@@ -87,6 +90,36 @@ if st.button("Thêm thiết bị"):
     else:
         st.error("Vui lòng nhập cả địa chỉ IP và tên thiết bị!")
 
+# Nhập file JSON
+uploaded_file = st.file_uploader("Nhập file JSON chứa danh sách thiết bị", type=["json"])
+if uploaded_file is not None:
+    try:
+        # Đọc file JSON
+        json_data = json.load(uploaded_file)
+        if isinstance(json_data, list):
+            new_devices = []
+            for item in json_data:
+                if isinstance(item, dict) and "ip" in item and "name" in item:
+                    new_devices.append((item["ip"], item["name"]))
+            # Cập nhật danh sách thiết bị
+            st.session_state.devices = new_devices
+            # Reset ping_counts cho các thiết bị mới
+            st.session_state.ping_counts = {ip: None for ip, _ in new_devices}
+            st.success("Đã nhập danh sách thiết bị từ file JSON!")
+        else:
+            st.error("File JSON phải chứa một danh sách các đối tượng!")
+    except Exception as e:
+        st.error(f"Lỗi khi đọc file JSON: {str(e)}")
+
+# Xuất file JSON
+if st.download_button(
+    label="Xuất danh sách thiết bị ra file JSON",
+    data=json.dumps([{"ip": ip, "name": name} for ip, name in st.session_state.devices], indent=2, ensure_ascii=False),
+    file_name="devices.json",
+    mime="application/json"
+):
+    st.success("Đã chuẩn bị file JSON để tải xuống!")
+
 # Danh sách thiết bị
 st.write("Danh sách thiết bị hiện tại:")
 for i, (ip, name) in enumerate(st.session_state.devices):
@@ -101,16 +134,14 @@ for i, (ip, name) in enumerate(st.session_state.devices):
         result_container = st.empty()
         ping_count = st.session_state.ping_counts.get(ip, None)
         if ping_count is None:
-            # Ping mỗi phút trong 10 phút
             ping_per_minute(ip, name, result_container)
         else:
-            # Ping mỗi giây cho số lần cụ thể
             ping_with_interval(ip, name, ping_count, result_container)
             st.session_state.ping_counts[ip] = None
         st.session_state.manual_ping = True
-    ping_options = ["Ping mỗi phút", "1", "5", "10"]
+    ping_options = ["Ping mỗi phút (tối đa 10 phút)", "1", "5", "10"]
     current_count = st.session_state.ping_counts.get(ip, None)
-    index = 0  # Mặc định là "Ping mỗi phút"
+    index = 0
     if current_count is not None and str(current_count) in ping_options[1:]:
         index = ping_options.index(str(current_count))
     selected_count = col4.selectbox(
@@ -119,19 +150,19 @@ for i, (ip, name) in enumerate(st.session_state.devices):
         index=index,
         key=f"count_{i}"
     )
-    if selected_count == "Ping mỗi phút":
+    if selected_count == "Ping mỗi phút (tối đa 10 phút)":
         st.session_state.ping_counts[ip] = None
     else:
         st.session_state.ping_counts[ip] = int(selected_count)
 
 # Ping tất cả thiết bị
 st.subheader("Ping tất cả thiết bị")
-all_ping_count = st.selectbox("Số lần ping cho tất cả thiết bị:", ["Ping mỗi phút", "1", "5", "10"], key="all_ping_count")
+all_ping_count = st.selectbox("Số lần ping cho tất cả thiết bị:", ["Ping mỗi phút (tối đa 10 phút)", "1", "5", "10"], key="all_ping_count")
 if st.button("Ping thủ công tất cả thiết bị"):
     result_container = st.empty()
     if all_ping_count == "Ping mỗi phút (tối đa 10 phút)":
         start_time = time.time()
-        max_duration = 600  # 10 phút
+        max_duration = 600
         while time.time() - start_time < max_duration:
             for ip, name in st.session_state.devices:
                 result = ping_ip(ip, name)
@@ -166,4 +197,4 @@ if st.session_state.devices:
             target=auto_ping, args=(st.session_state.devices,), daemon=True
         )
         st.session_state.auto_ping_thread.start()
-        st.write(f"Bắt đầu tự động ping các thiết bị trong danh sách mỗi 1 phút...")
+        st.write(f"Bắt đầu tự động ping các thiết bị trong danh sách mỗi 5 phút...")

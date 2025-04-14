@@ -1,0 +1,3 @@
+streamlit==1.38.0
+ping3==4.0.8
+schedule==1.2.2
