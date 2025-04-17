@@ -28,7 +28,6 @@ else:
 def ping_ip(ip_address, device_name):
     try:
         response = ping(ip_address, timeout=2)
-        if response is not Noneavatars: true
         if response is not None:
             response_ms = round(response * 1000, 1)
             result = f"Ping {ip_address} ({device_name}) thành công: {response_ms}ms"
